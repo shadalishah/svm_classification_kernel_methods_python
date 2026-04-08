@@ -1,0 +1,609 @@
+---
+title: "Support Vector Machines"
+subtitle: "Chapter 9: ISLR2 Exercise Solutions"
+author: "Shad Ali Shah"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    number-depth: 3
+    code-fold: true
+    code-tools: true
+    code-summary: "Show code"
+    theme: cosmo
+    colorlinks: true
+    link-citations: true
+    df-print: kable
+    fig-cap-location: bottom
+    tbl-cap-location: top
+    crossref:
+      fig-title: "Figure"
+      tbl-title: "Table"
+      fig-prefix: "Fig."
+      tbl-prefix: "Table"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+  cache: false
+  keep-going: true
+  fig-width: 6.5
+  fig-height: 4
+jupyter: python3
+---
+
+# Chapter 9
+
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+from matplotlib.pyplot import subplots, cm
+import sklearn.model_selection as skm
+from ISLP import load_data, confusion_table
+from sklearn.svm import SVC
+from ISLP.svm import plot as plot_svm
+from sklearn.metrics import (RocCurveDisplay as ROC, accuracy_score)
+from ISLP.models import ModelSpec as MS
+import statsmodels.api as sm
+from sklearn.preprocessing import StandardScaler
+```
+
+## Exercise 4
+
+```{python}
+np.random.seed(10)
+y=np.concatenate((np.ones(30),np.zeros(70)))#We implicitly defined two classes named 1 and 0 
+#for 100 obs.
+x=np.random.rand(100,2)#We prefer to modify values of x by adding or subtracting a random constant
+# in order to have more distinguishable features
+x[y==1] += 0.5#Choose the constant until the exercise instruction is satisfied
+fig,ax=subplots(figsize=(12,12))
+ax.scatter(x[:,0],x[:,1],c=y,cmap=cm.coolwarm)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2');
+```
+
+```{python}
+(X_train,X_test,y_train,y_test)=skm.train_test_split(x,y,test_size=0.5,random_state=11)
+```
+
+```{python}
+# Support vector classifier
+svm_linear = SVC(C=10, kernel='linear')
+svm_linear.fit(X_train, y_train)
+```
+
+```{python}
+confusion_table(y_train,svm_linear.predict(X_train))
+```
+
+Training error found for SVC is 12%.
+
+```{python}
+fig, ax = subplots(figsize=(8,8))
+plot_svm(x,y,svm_linear,ax=ax);
+```
+
+```{python}
+#SVC polynomial
+svm_poly = SVC(C=10, kernel='poly',degree=4)
+svm_poly.fit(X_train, y_train)
+```
+
+```{python}
+confusion_table(y_train,svm_poly.predict(X_train))
+```
+
+Training error found for polynomial SVC is 10%.
+
+```{python}
+fig, ax = subplots(figsize=(8,8))
+plot_svm(x,y,svm_poly,ax=ax);
+```
+
+```{python}
+#SVM rbf
+svm_rbf = SVC(C=10, kernel='rbf',gamma=1.0)
+svm_rbf.fit(X_train, y_train)
+```
+
+```{python}
+confusion_table(y_train,svm_rbf.predict(X_train))
+```
+
+Training error found for SVC is 12%.
+
+```{python}
+fig, ax = subplots(figsize=(8,8))
+plot_svm(x,y,svm_rbf,ax=ax);
+```
+
+```{python}
+method=[svm_linear,svm_poly,svm_rbf]
+Method=['SVC','SVC poly','SVM rbf']
+df=pd.DataFrame({'Test error':[1-accuracy_score(y_test, i.predict(X_test)) for i in method]},
+                index=Method)
+df
+```
+
+The most performant models are SVC and SVM rbf with equal test errors of 8%.
+
+## Exercise 5
+
+### (a)
+
+```{python}
+rng = np.random.default_rng (5)
+x1 = rng.uniform(size =500) - 0.5
+x2 = rng.uniform(size =500) - 0.5
+y = x1**2 - x2**2 > 0
+df = pd.DataFrame({'x1':x1, 'x2':x2, 'y':y})#Last line was added to prepare for logistic regression
+```
+
+### (b)
+
+```{python}
+fig,ax=subplots(figsize=(12,12))
+ax.scatter(x1,x2,c=y,cmap=cm.coolwarm)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2');
+```
+
+### (c)
+
+```{python}
+design = MS(df.iloc[:,0:2])
+X = design.fit_transform(df)
+glm = sm.GLM(y,X.values,family=sm.families.Binomial())
+results = glm.fit()
+```
+
+### (d)
+
+```{python}
+glm_pred = results.predict(X)
+glm_dummy=np.where(glm_pred>0.5,True,False)
+fig,ax=subplots(figsize=(12,12))
+ax.scatter(x1,x2,c=glm_dummy,cmap=mpl.cm.Paired)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2')
+ax.set_title('Logistic regression');
+```
+
+The decision boundary is indeed linear.
+
+### (e)
+
+```{python}
+#Add new dependant variables to the dataframe
+df['x1new']=df['x1']**2
+df['x1x2']=df['x1']*df['x2']
+df['logx2']=np.log(np.abs(df['x2']))
+```
+
+```{python}
+design_new = MS(df.columns.drop('y'))#Recall the hierarchy principle. When X1*X2 are considered
+# both X1 and X2 must be kept when fitting the model.
+X_new = design_new.fit_transform(df)
+glm_new = sm.GLM(y,X_new.values,family=sm.families.Binomial())
+results_new = glm_new.fit()
+```
+
+### (f)
+
+```{python}
+glm_pred = results_new.predict(X_new)
+glm_dummy=np.where(glm_pred>0.5,True,False)
+fig,ax=subplots(figsize=(12,12))
+ax.scatter(x1,x2,c=glm_dummy,cmap=cm.coolwarm)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2')
+ax.set_title('Nonlinear Logistic regression');
+```
+
+### (g)
+
+```{python}
+svc_linear = SVC(C=10, kernel='linear')
+svc_linear.fit(df.iloc[:,0:2].values, df['y'])
+```
+
+```{python}
+fig, ax = subplots(figsize=(8,8))
+plot_svm(df.iloc[:,0:2],y,svc_linear,ax=ax);
+```
+
+### (f)
+
+```{python}
+svc_poly = SVC(C=10, kernel='poly', degree=2)
+svc_poly.fit(df.iloc[:,0:2].values, df['y'])
+```
+
+```{python}
+fig, ax = subplots(figsize=(8,8))
+plot_svm(df.iloc[:,0:2],y,svc_poly,ax=ax);
+```
+
+### (i)
+
+```{python}
+method=[results,results_new,svc_linear,svc_poly]
+Method=['Linear logit','Nonlinear logit','SVC','SVC Poly']
+Xs=[MS(df.iloc[:,0:2]).fit_transform(df).values,MS(df.columns.drop('y')).fit_transform(df).values,
+    df.iloc[:,0:2].values,df.iloc[:,0:2].values]
+Accuracy=pd.DataFrame({'Accuracy score':[accuracy_score(y, np.where(i.predict(Xi),True,False)) 
+                                         for i,Xi in zip(method,Xs)]}, index=Method)
+Accuracy
+```
+
+Performances of Linear logit and SVC are quite similar, although this latter is better.  
+On the other hand SVM performs way better than Nonlinear logit.
+
+## Exercise 6
+
+### (a)
+
+```{python}
+np.random.seed(1)
+y=np.concatenate((np.ones(30),np.zeros(70)))
+x=np.random.rand(100,2)#We prefer to modify values of x by adding or subtracting a random constant
+# in order to have more distinguashable features
+x[y==1] += 0.9#Choose the constant untill the exercise instruction is satisfied
+fig,ax=subplots(figsize=(12,12))
+ax.scatter(x[:,0],x[:,1],c=y,cmap=cm.coolwarm)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2');
+```
+
+### (b)
+
+```{python}
+C_param = [{'C': [0.1, 1, 10, 100, 1000]}]
+grid = skm.GridSearchCV(SVC(kernel='linear'), C_param, cv=10, 
+                        scoring='accuracy', return_train_score=True)
+grid.fit(x, y)
+grid.best_params_ 
+```
+
+```{python}
+train_CV=1-grid.cv_results_['mean_train_score']
+```
+
+```{python}
+train_CV
+```
+
+```{python}
+number=[]
+for c in [0.1, 1, 10, 100, 1000]:
+    svc_linear = SVC(C=c, kernel='linear')
+    svc_linear.fit(x, y)
+    number.append(int((1-svc_linear.score(x,y))*100))
+```
+
+```{python}
+number
+```
+
+Best parameter based on training error is 10.
+
+We notice that `number` is practically the conversion of `train_CV` to the number of classifications modulo the total number of observations.
+
+### (c) and (d)
+
+```{python}
+np.random.seed(11)
+y_test=np.concatenate((np.ones(40),np.zeros(60)))
+x_test=np.random.rand(100,2)#We prefer to modify values of x by adding or subtracting a random constant
+# in order to have more distinguashable features
+x_test[y==1] += 0.9
+```
+
+```{python}
+test_errors=[]
+for c in [0.1, 1, 10, 100, 1000]:
+    svc_linear = SVC(C=c, kernel='linear')
+    svc_linear.fit(x, y)
+    test_errors.append(1-svc_linear.score(x_test,y_test))
+```
+
+```{python}
+test_errors
+```
+
+Least test error is obtained for C=1. Thus, the best parameter obtained with test set is lower. But at the same time, test error parameter agrees with cross-validated one.
+
+## Exercise 7
+
+```{python}
+Auto=load_data("Auto")
+```
+
+### (a)
+
+```{python}
+#mpg is the gas mileage evoked in the question
+Auto['mpg01']=np.where(Auto['mpg']>np.median(Auto['mpg']),1,0)
+```
+
+### (b)
+
+```{python}
+y=Auto['mpg01']
+```
+
+```{python}
+#Before fitting the grid we should do scaling on the continuous features
+#This is justified as svm are based on distance computation: features with great values can
+#dominate the kernel matrix and reduce the performance of the model
+features_to_scale=Auto[['displacement','horsepower','weight','acceleration']]
+scaled_features=StandardScaler().fit_transform(features_to_scale)
+part1= pd.DataFrame(scaled_features, columns=['displacement','horsepower','weight','acceleration'])
+part2= Auto[['cylinders','year','origin']].reset_index(drop=True)
+X=pd.concat([part1,part2],axis=1)
+```
+
+```{python}
+svm_linear= SVC(C=10, kernel='linear')
+kfold = skm.KFold(5,random_state=0,shuffle=True)
+grid = skm.GridSearchCV(svm_linear,{'C':[0.001,0.01,0.1,1,5,10,100]},refit=True,cv=kfold,
+                        scoring='accuracy')
+grid.fit(X.values, y)
+grid.best_estimator_
+```
+
+```{python}
+print('Reported cross-validation errors are',1-grid.cv_results_[('mean_test_score')])
+```
+
+We see that `C=1` results in the lowest cross-validation error of 8.66%. We also notice that the found minimal error is not shared with other values of `C`.
+
+### (c)
+
+```{python}
+#Let's tune the model in case of polynomial basis kernel both for C and degree values
+svm_poly= SVC(C=10, kernel='poly')
+grid_poly = skm.GridSearchCV(svm_poly,{'C':[0.001,0.01,0.1,1,5,10,100],
+                                   'degree':[2,3,4,5]},refit=True,cv=kfold,
+                        scoring='accuracy')
+grid_poly.fit(X.values, y)
+grid_poly.best_estimator_
+```
+
+```{python}
+grid_poly.best_params_
+```
+
+Best parameters for polynomial basis kernel are `C=100 and degree=5`
+
+```{python}
+#Now is the turn of rbf 
+svm_rbf= SVC(C=10, kernel='rbf')
+grid_rbf = skm.GridSearchCV(svm_linear,{'C':[0.001,0.01,0.1,1,5,10,100],'gamma':[0.5,1,2,3,4]},
+                             refit=True,cv=kfold,scoring='accuracy')
+grid_rbf.fit(X.values, y)
+grid_rbf.best_estimator_
+```
+
+```{python}
+grid_rbf.best_params_
+```
+
+Best parameters for RBF are `C=1 and gamma=0.5`
+
+### (d)
+
+```{python}
+X.shape
+```
+
+```{python}
+#Plot a linear boundary
+fig, ax = subplots(figsize=(10,10))
+plot_svm(X,y,grid.best_estimator_,features=(1,3),ax=ax)
+ax.set_xlabel(X.columns[1])
+ax.set_ylabel(X.columns[3]);
+```
+
+```{python}
+#Plot a poly boundary
+fig, ax = subplots(figsize=(10,10))
+plot_svm(X,y,grid_poly.best_estimator_,features=(1,3),ax=ax)
+ax.set_xlabel(X.columns[1])
+ax.set_ylabel(X.columns[3]);
+```
+
+```{python}
+#Plot an rbf boundary
+fig, ax = subplots(figsize=(10,10))
+plot_svm(X,y,grid_rbf.best_estimator_,features=(1,3),ax=ax)
+ax.set_xlabel(X.columns[1])
+ax.set_ylabel(X.columns[3]);
+```
+
+The use of features as suggested in the instructions does not give a comprehensive pictures of the boundaries since there are multiples features. It is suggested to reduce the dimensionality of components instead using PCA.
+
+## Exercise 8
+
+### (a)
+
+```{python}
+OJ=load_data('OJ')
+```
+
+```{python}
+OJ['Store7']=np.where(OJ['Store7']=='Yes',1,0)
+```
+
+```{python}
+training,test=skm.train_test_split(OJ,train_size=800,random_state=11)
+```
+
+### (b)
+
+```{python}
+X_training=training.iloc[:,1:]
+y_train=training['Purchase']
+```
+
+```{python}
+#We should do scaling on the continous features as for the previous exercise
+features_no_scale=['StoreID', 'SpecialCH', 'SpecialMM', 'Store7', 'STORE']
+features_to_scale=X_training[X_training.columns.difference(features_no_scale)]
+scaled_features=StandardScaler().fit_transform(features_to_scale)
+part1= pd.DataFrame(scaled_features, columns=X_training.columns.difference(features_no_scale))
+part2= X_training[features_no_scale].reset_index(drop=True)
+X_train=pd.concat([part1,part2],axis=1)
+```
+
+```{python}
+svm_linear= SVC(C=0.01, kernel='linear')
+svm_linear.fit(X_train, y_train)
+```
+
+```{python}
+svm_linear.n_support_
+```
+
+There are $218+217=435$ support vectors, 218 observations among them belong to CH class.
+
+### (c)
+
+```{python}
+#First, we should do scaling on the test size as well
+X_testing=test.iloc[:,1:]
+y_test=test['Purchase']
+features_to_scale=X_testing[X_testing.columns.difference(features_no_scale)]
+scaled_features=StandardScaler().fit_transform(features_to_scale)
+part1= pd.DataFrame(scaled_features, columns=X_testing.columns.difference(features_no_scale))
+part2= X_testing[features_no_scale].reset_index(drop=True)
+X_test=pd.concat([part1,part2],axis=1)
+```
+
+```{python}
+test_error=1-svm_linear.score(X_test,y_test)
+train_error=1-svm_linear.score(X_train,y_train)
+```
+
+```{python}
+print('Training error fot the linear support vector classifier is',train_error)
+print('Test error fot the linear support vector classifier is',test_error)
+
+```
+
+### (d)
+
+```{python}
+kfold = skm.KFold(5,random_state=0,shuffle=True)
+grid_linear = skm.GridSearchCV(svm_linear,{'C':[0.01,0.1,1,10]},refit=True,cv=kfold,scoring='accuracy')
+grid_linear.fit(X_train.values, y_train)
+
+```
+
+```{python}
+print('The best tuning parameter is',grid_linear.best_params_)
+```
+
+### (e)
+
+```{python}
+best_estimator=grid_linear.best_estimator_
+best_test_error=1-best_estimator.score(X_test.values,y_test)
+best_train_error=1-best_estimator.score(X_train.values,y_train)
+```
+
+```{python}
+print('Training error fot the linear support vector classifier with the best tuning\
+      parameter is',best_train_error)
+print('Test error fot the linear support vector classifier with the best tuning\
+      parameter is',best_test_error)
+```
+
+### (f)
+
+```{python}
+#Fit SVM with RBF and C=0.01
+svm_rbf1= SVC(C=0.01, kernel='rbf')
+svm_rbf1.fit(X_train, y_train)
+```
+
+```{python}
+#compute test error and training error
+test_error_rbf=1-svm_rbf1.score(X_test,y_test)
+train_error_rbf=1-svm_rbf1.score(X_train,y_train)
+```
+
+```{python}
+print('Training error for the SVM wtih C=0.01 is',train_error_rbf)
+print('Test error for the SVM wtih C=0.01 is',test_error_rbf)
+```
+
+```{python}
+grid_rbf = skm.GridSearchCV(svm_rbf1,{'C':[0.01,0.1,1,10,100]},refit=True,cv=kfold,scoring='accuracy')
+grid_rbf.fit(X_train.values, y_train)
+print('The best tuning parameter is',grid_rbf.best_params_)
+```
+
+```{python}
+svm_rbf_best=grid_rbf.best_estimator_
+rbf_best_test_error=1-svm_rbf_best.score(X_test.values,y_test)
+rbf_best_train_error=1-svm_rbf_best.score(X_train.values,y_train)
+```
+
+```{python}
+print('Training error for the rbf SVM with the best tuning parameter is',rbf_best_train_error)
+print('Test error for the rbf SVM with the best tuning parameter is',rbf_best_test_error)
+```
+
+### (g)
+
+```{python}
+#Fit SVM with polynomial kernel of degree=2 and C=0.01
+svm_poly1= SVC(C=0.01, kernel='poly',degree=2)
+svm_poly1.fit(X_train, y_train)
+```
+
+```{python}
+#compute test error and training error
+test_error_poly=1-svm_poly1.score(X_test,y_test)
+train_error_poly=1-svm_poly1.score(X_train,y_train)
+```
+
+```{python}
+print('Training error for the SVM wtih C=0.01 and polynomial kernel is',train_error_poly)
+print('Test error for the SVM wtih C=0.01 and polynomial kernel is',test_error_poly)
+```
+
+```{python}
+grid_poly = skm.GridSearchCV(svm_poly1,{'C':[0.01,0.1,1,10,100]},refit=True,
+                             cv=kfold,scoring='accuracy')
+grid_poly.fit(X_train.values, y_train)
+print('The best tuning parameter is',grid_poly.best_params_)
+```
+
+```{python}
+svm_poly_best=grid_poly.best_estimator_
+poly_best_test_error=1-svm_poly_best.score(X_test.values,y_test)
+poly_best_train_error=1-svm_poly_best.score(X_train.values,y_train)
+```
+
+```{python}
+print('Training error for the SVM with a polynomial kernel and the best\
+tuning parameter is',poly_best_train_error)
+print('Test error for the SVM with a polynomial kernel and the best\
+tuning parameter is',poly_best_test_error)
+```
+
+### (h)
+
+By comparing values of the best test errors obtained, we conclude that the three used kernels are practicailly identical with a slight preference for the linear decsion boundary with an error of 18.15%.
+
+```{python}
+
+```
